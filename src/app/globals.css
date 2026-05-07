@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---- CSS Custom Properties ---- */
+:root {
+  --color-gold-primary: #c9a84c;
+  --color-gold-secondary: #8b6914;
+  --color-gold-accent: #f0d080;
+  --color-gold-dark: #1a1208;
+  --color-gold-light: #fdf8ee;
+}
+
+/* ---- Base Styles ---- */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-jewelry-light text-gray-900 antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
+  }
+
+  *:focus-visible {
+    @apply outline-none ring-2 ring-jewelry-primary ring-offset-2;
+  }
+}
+
+/* ---- Utility Classes ---- */
+@layer utilities {
+  /* Gold shimmer text */
+  .text-gold-shimmer {
+    background: linear-gradient(
+      90deg,
+      #c9a84c 0%,
+      #f0d080 40%,
+      #c9a84c 60%,
+      #f0d080 100%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: shimmer 3s linear infinite;
+  }
+
+  /* Glass card */
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-sm border border-white/50 shadow-xl;
+  }
+
+  /* Scrollbar styling */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #c9a84c #f3f4f6;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-gray-100 rounded-full;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-gold-400 rounded-full;
+  }
+}
+
+/* ---- React Compare Slider Overrides ---- */
+.__rcs-handle-button {
+  background-color: var(--color-gold-primary) !important;
+  border-color: white !important;
+}
+
+.__rcs-handle-line {
+  background-color: var(--color-gold-primary) !important;
+}
