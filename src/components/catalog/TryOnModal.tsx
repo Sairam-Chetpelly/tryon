@@ -130,18 +130,11 @@ export default function TryOnModal({
     setErrorMessage(null);
 
     try {
-      // Fetch the product image as a File to send to the API (Requirement 7.4)
-      const jewelryImageResponse = await fetch(product.imageUrl);
-      const jewelryImageBlob = await jewelryImageResponse.blob();
-      const jewelryImageFile = new File(
-        [jewelryImageBlob],
-        "jewelry-image.jpg",
-        { type: jewelryImageBlob.type || "image/jpeg" }
-      );
-
+      // Send the jewelry image URL to the server — it fetches it server-side
+      // to avoid browser CORS issues with S3 URLs (Requirement 7.4)
       const formData = new FormData();
       formData.append("userImage", userImage.file);
-      formData.append("jewelryImage", jewelryImageFile);
+      formData.append("jewelryImageUrl", product.imageUrl);
       formData.append("category", product.category);
 
       const response = await fetch("/api/tryon", {

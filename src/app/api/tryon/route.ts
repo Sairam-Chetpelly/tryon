@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
 
     const userImageFile = formData.get("userImage") as File | null;
     const jewelryImageFile = formData.get("jewelryImage") as File | null;
+    const jewelryImageUrl = formData.get("jewelryImageUrl") as string | null;
     const category = (formData.get("category") as string) ?? "necklace";
 
     // ---- Validation ----
@@ -35,11 +36,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!jewelryImageFile) {
+    if (!jewelryImageFile && !jewelryImageUrl) {
       return NextResponse.json(
         { success: false, error: "Jewelry image is required" },
         { status: 400 }
       );
+    }
+
+    // If a URL was provided instead of a file, fetch it server-side (avoids browser CORS)
+    let resolvedJewelryFile: File = jewelryImageFile!;
+    if (!jewelryImageFile && jewelryImageUrl) {
+      try {
+        const res = await fetch(jewelryImageUrl);
+        if (!res.ok) throw new Error(`Failed to fetch jewelry image: ${res.status}`);
+        const blob = await res.blob();
+        const contentType = res.headers.get("content-type") ?? "image/jpeg";
+        resolvedJewelryFile = new File([blob], "jewelry-image.jpg", { type: contentType });
+      } catch (fetchErr) {
+        return NextResponse.json(
+          { success: false, error: "Could not load jewelry image from URL" },
+          { status: 400 }
+        );
+      }
     }
 
     // Validate file types
@@ -53,11 +71,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!ALLOWED_IMAGE_TYPES.includes(jewelryImageFile.type)) {
+    if (!ALLOWED_IMAGE_TYPES.includes(resolvedJewelryFile.type)) {
       return NextResponse.json(
         {
           success: false,
-          error: `Invalid jewelry image type: ${jewelryImageFile.type}. Allowed: JPG, PNG, WebP`,
+          error: `Invalid jewelry image type: ${resolvedJewelryFile.type}. Allowed: JPG, PNG, WebP`,
         },
         { status: 400 }
       );
@@ -71,7 +89,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (jewelryImageFile.size > MAX_FILE_SIZE_BYTES) {
+    if (resolvedJewelryFile.size > MAX_FILE_SIZE_BYTES) {
       return NextResponse.json(
         { success: false, error: "Jewelry image exceeds 10MB limit" },
         { status: 400 }
@@ -80,9 +98,7 @@ export async function POST(request: NextRequest) {
 
     // ---- Convert files to base64 ----
     const userImageBuffer = Buffer.from(await userImageFile.arrayBuffer());
-    const jewelryImageBuffer = Buffer.from(
-      await jewelryImageFile.arrayBuffer()
-    );
+    const jewelryImageBuffer = Buffer.from(await resolvedJewelryFile.arrayBuffer());
 
     const userImageBase64 = userImageBuffer.toString("base64");
     const jewelryImageBase64 = jewelryImageBuffer.toString("base64");
@@ -98,7 +114,7 @@ export async function POST(request: NextRequest) {
     console.log(
       `[API /tryon] Processing try-on for category: ${category}, ` +
         `user image: ${(userImageFile.size / 1024).toFixed(0)}KB, ` +
-        `jewelry image: ${(jewelryImageFile.size / 1024).toFixed(0)}KB`
+        `jewelry image: ${(resolvedJewelryFile.size / 1024).toFixed(0)}KB`
     );
 
     const result = await processTryOn(tryOnRequest);
@@ -142,7 +158,7 @@ export async function POST(request: NextRequest) {
       const { url: persistedJewelryUrl } = await uploadProductImage(
         jewelryBuffer,
         `tryon-jewelry-${Date.now()}.jpg`,
-        jewelryImageFile.type
+        resolvedJewelryFile.type
       );
 
       // Save to MongoDB history collection (global, visible to all users)
