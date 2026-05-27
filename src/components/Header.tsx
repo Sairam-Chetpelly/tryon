@@ -7,12 +7,18 @@
 
 import React from "react";
 import { History, Gem } from "lucide-react";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 interface HeaderProps {
   onHistoryOpen: () => void;
 }
 
 export default function Header({ onHistoryOpen }: HeaderProps) {
+  const pathname = usePathname();
+  const isProductsActive = pathname.startsWith("/products");
+
   return (
     <header className="sticky top-0 z-30 w-full bg-white/80 backdrop-blur-md border-b border-gold-100 shadow-sm">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
@@ -33,6 +39,27 @@ export default function Header({ onHistoryOpen }: HeaderProps) {
 
         {/* Right actions */}
         <div className="flex items-center gap-3">
+          {/* Products link */}
+          <Link
+            href="/products"
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+              isProductsActive
+                ? "bg-jewelry-primary text-white shadow-sm"
+                : "text-gray-600 hover:text-jewelry-primary hover:bg-gold-50"
+            )}
+          >
+            Products
+          </Link>
+
+          {/* Admin link */}
+          <Link
+            href="/products/admin"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all text-gray-600 hover:text-jewelry-primary hover:bg-gold-50"
+          >
+            Admin
+          </Link>
+
           {/* Provider badge */}
           <span className="hidden sm:flex items-center gap-1.5 text-xs bg-gold-50 border border-gold-200 text-jewelry-secondary px-3 py-1.5 rounded-full font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />

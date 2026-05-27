@@ -97,6 +97,8 @@ export interface ImageDropzoneProps {
   onClear: () => void;
   disabled?: boolean;
   className?: string;
+  /** Show a "Take Photo" button that opens the device camera */
+  showCamera?: boolean;
 }
 
 export interface ResultDisplayProps {

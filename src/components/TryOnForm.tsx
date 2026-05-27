@@ -123,39 +123,12 @@ export default function TryOnForm() {
       setSession(completedSession);
       setStatus("completed");
       toast.success("Your jewelry try-on is ready!");
-
-      // Save to history (fire-and-forget)
-      saveToHistory(completedSession, data.resultImageBase64);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Something went wrong";
       setErrorMessage(message);
       setStatus("error");
       toast.error(message);
-    }
-  };
-
-  const saveToHistory = async (
-    completedSession: TryOnSession,
-    resultBase64?: string
-  ) => {
-    try {
-      const resultImageUrl =
-        completedSession.resultImageUrl ??
-        (resultBase64 ? `data:image/jpeg;base64,${resultBase64}` : "");
-
-      await fetch("/api/history", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userImageUrl: completedSession.userImage?.preview ?? "",
-          jewelryImageUrl: completedSession.jewelryImage?.preview ?? "",
-          resultImageUrl,
-          jewelryCategory: completedSession.jewelryCategory,
-        }),
-      });
-    } catch {
-      // History save failure is non-critical
     }
   };
 
@@ -204,6 +177,7 @@ export default function TryOnForm() {
               currentImage={userImage}
               onClear={handleClearUser}
               disabled={isProcessing}
+              showCamera
             />
 
             <ImageDropzone

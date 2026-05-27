@@ -10,6 +10,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { processTryOn } from "@/lib/tryon-service";
+import { uploadProductImage } from "@/lib/s3-uploader";
+import { getDb } from "@/lib/mongodb";
 import { ALLOWED_IMAGE_TYPES, MAX_FILE_SIZE_BYTES } from "@/lib/constants";
 import type { JewelryCategory, TryOnRequest } from "@/types";
 
@@ -112,10 +114,58 @@ export async function POST(request: NextRequest) {
       `[API /tryon] Completed in ${result.processingTimeMs}ms via ${result.provider}`
     );
 
+    // ── Upload result image to S3 and save to global history ──────────────
+    let persistedResultUrl: string | undefined = result.resultImageUrl;
+
+    try {
+      // If we only have base64, upload it to S3 so the URL is permanent
+      if (!persistedResultUrl && result.resultImageBase64) {
+        const resultBuffer = Buffer.from(result.resultImageBase64, "base64");
+        const { url } = await uploadProductImage(
+          resultBuffer,
+          `tryon-result-${Date.now()}.jpg`,
+          "image/jpeg"
+        );
+        persistedResultUrl = url;
+      }
+
+      // Upload user image to S3 for persistent storage in history
+      const userImageBuffer = Buffer.from(userImageBase64, "base64");
+      const { url: persistedUserUrl } = await uploadProductImage(
+        userImageBuffer,
+        `tryon-user-${Date.now()}.jpg`,
+        userImageFile.type
+      );
+
+      // Upload jewelry image to S3 for persistent storage in history
+      const jewelryBuffer = Buffer.from(jewelryImageBase64, "base64");
+      const { url: persistedJewelryUrl } = await uploadProductImage(
+        jewelryBuffer,
+        `tryon-jewelry-${Date.now()}.jpg`,
+        jewelryImageFile.type
+      );
+
+      // Save to MongoDB history collection (global, visible to all users)
+      if (persistedResultUrl) {
+        const db = await getDb();
+        await db.collection("history").insertOne({
+          userImageUrl: persistedUserUrl,
+          jewelryImageUrl: persistedJewelryUrl,
+          resultImageUrl: persistedResultUrl,
+          jewelryCategory: category,
+          createdAt: new Date(),
+        });
+        console.log("[API /tryon] Saved to global history");
+      }
+    } catch (historyErr) {
+      // History save is non-critical — log but don't fail the response
+      console.error("[API /tryon] Failed to save history:", historyErr);
+    }
+
     return NextResponse.json({
       success: true,
       resultImageBase64: result.resultImageBase64,
-      resultImageUrl: result.resultImageUrl,
+      resultImageUrl: persistedResultUrl ?? result.resultImageUrl,
       processingTimeMs: result.processingTimeMs,
       provider: result.provider,
     });
