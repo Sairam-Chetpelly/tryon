@@ -130,52 +130,67 @@ export async function POST(request: NextRequest) {
       `[API /tryon] Completed in ${result.processingTimeMs}ms via ${result.provider}`
     );
 
-    // ── Upload result image to S3 and save to global history ──────────────
-    let persistedResultUrl: string | undefined = result.resultImageUrl;
+    // ── Upload all images to your S3 bucket and save to global history ───────
+    // Always re-upload the result to your own S3 — the AI provider URL may be
+    // a signed/expiring URL (e.g. YouCam's 2-hour TTL URLs).
+    let persistedResultUrl: string | undefined;
 
     try {
-      // If we only have base64, upload it to S3 so the URL is permanent
-      if (!persistedResultUrl && result.resultImageBase64) {
-        const resultBuffer = Buffer.from(result.resultImageBase64, "base64");
-        const { url } = await uploadProductImage(
-          resultBuffer,
-          `tryon-result-${Date.now()}.jpg`,
-          "image/jpeg"
-        );
-        persistedResultUrl = url;
+      // 1. Get result image bytes — from base64 or by fetching the provider URL
+      let resultBuffer: Buffer;
+      if (result.resultImageBase64) {
+        resultBuffer = Buffer.from(result.resultImageBase64, "base64");
+      } else if (result.resultImageUrl) {
+        const res = await fetch(result.resultImageUrl);
+        if (!res.ok) throw new Error(`Failed to fetch result image: ${res.status}`);
+        resultBuffer = Buffer.from(await res.arrayBuffer());
+      } else {
+        throw new Error("No result image data returned from AI provider");
       }
 
-      // Upload user image to S3 for persistent storage in history
-      const userImageBuffer = Buffer.from(userImageBase64, "base64");
+      // 2. Upload result to your S3
+      const { url: resultS3Url } = await uploadProductImage(
+        resultBuffer,
+        `tryon-result-${Date.now()}.jpg`,
+        "image/jpeg"
+      );
+      persistedResultUrl = resultS3Url;
+      console.log(`[API /tryon] Result uploaded to S3: ${persistedResultUrl}`);
+
+      // 3. Upload user image to S3
       const { url: persistedUserUrl } = await uploadProductImage(
         userImageBuffer,
         `tryon-user-${Date.now()}.jpg`,
         userImageFile.type
       );
 
-      // Upload jewelry image to S3 for persistent storage in history
-      const jewelryBuffer = Buffer.from(jewelryImageBase64, "base64");
-      const { url: persistedJewelryUrl } = await uploadProductImage(
-        jewelryBuffer,
-        `tryon-jewelry-${Date.now()}.jpg`,
-        resolvedJewelryFile.type
-      );
-
-      // Save to MongoDB history collection (global, visible to all users)
-      if (persistedResultUrl) {
-        const db = await getDb();
-        await db.collection("history").insertOne({
-          userImageUrl: persistedUserUrl,
-          jewelryImageUrl: persistedJewelryUrl,
-          resultImageUrl: persistedResultUrl,
-          jewelryCategory: category,
-          createdAt: new Date(),
-        });
-        console.log("[API /tryon] Saved to global history");
+      // 4. Upload jewelry image to S3 (or reuse the original URL if it's already in your bucket)
+      let persistedJewelryUrl: string;
+      if (jewelryImageUrl && jewelryImageUrl.includes("techiebears-internal.s3")) {
+        // Already in your bucket — no need to re-upload
+        persistedJewelryUrl = jewelryImageUrl;
+      } else {
+        const { url } = await uploadProductImage(
+          jewelryImageBuffer,
+          `tryon-jewelry-${Date.now()}.jpg`,
+          resolvedJewelryFile.type
+        );
+        persistedJewelryUrl = url;
       }
+
+      // 5. Save to MongoDB history
+      const db = await getDb();
+      await db.collection("history").insertOne({
+        userImageUrl: persistedUserUrl,
+        jewelryImageUrl: persistedJewelryUrl,
+        resultImageUrl: persistedResultUrl,
+        jewelryCategory: category,
+        createdAt: new Date(),
+      });
+      console.log("[API /tryon] Saved to global history");
     } catch (historyErr) {
-      // History save is non-critical — log but don't fail the response
-      console.error("[API /tryon] Failed to save history:", historyErr);
+      // Non-critical — log but don't fail the response
+      console.error("[API /tryon] Failed to save to S3/history:", historyErr);
     }
 
     return NextResponse.json({

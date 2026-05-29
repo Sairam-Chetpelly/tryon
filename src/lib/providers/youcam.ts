@@ -151,10 +151,10 @@ export async function youcamTryOn(
         (axiosError.response.data?.message as string) ??
         (axiosError.response.data?.error as string) ??
         axiosError.message;
-      throw new Error(`YouCam API error: ${msg}`);
+      throw new Error(`AI error: ${msg}`);
     }
 
-    throw new Error(`YouCam API error: ${(error as Error).message}`);
+    throw new Error(`AI error: ${(error as Error).message}`);
   }
 }
 
@@ -274,7 +274,7 @@ async function pollTaskResult(
     if (taskStatus === "error" || taskStatus === "failed") {
       const errMsg =
         data?.error_message ?? data?.error ?? data?.message ?? "Processing failed";
-      throw new Error(`YouCam task failed: ${errMsg}`);
+      throw new Error(`AI failed: ${errMsg}`);
     }
     // "processing" | "pending" | "" → keep polling
   }
